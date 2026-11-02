@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parametros CR-001 - TA (Histórico)</title>
+<style>
+  body { font-family: system-ui, Arial, sans-serif; background: #f8fafc; margin: 0; padding: 20px; }
+  h1 { text-align: center; color: #1e293b; }
+  .controls { text-align: center; margin-bottom: 20px; }
+  button { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; background: white; font-size: 0.85rem; }
+  th, td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: center; }
+  th { background: #f97316; color: white; }
+  .sensor { background: #fed7aa; font-weight: bold; text-align: left; }
+  #status { margin-top: 10px; text-align: center; }
+</style>
+</head>
+<body>
+<h1>Parametros CR-001 - TA</h1>
+<div class="controls">
+  <button id="btn">Actualizar datos</button>
+  <div id="status">Haz clic en Actualizar para cargar el histórico desde Supabase.</div>
+</div>
+<div id="tabla"></div>
+
+<script>
+const horas = [7,8,9,10,11,12,13,14,15,16,17,18];
+const etiquetasHora = horas.map(h => `${String(h).padStart(2,'0')}:00 / ${String(h+1).padStart(2,'0')}:00`);
+
+document.getElementById('btn').addEventListener('click', cargar);
+
+async function cargar() {
+  const status = document.getElementById('status');
+  status.textContent = 'Cargando...';
+  try {
+    const res = await fetch('/api/resumen');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Error');
+    renderTabla(data.resultados || []);
+    status.textContent = `Datos cargados (${(data.resultados || []).length} registros)`;
+  } catch (e) {
+    status.textContent = 'Error: ' + e.message;
+  }
+}
+
+function renderTabla(registros) {
+  const porTag = {};
+  registros.forEach(r => {
+    const tag = (r.tag || '').toUpperCase();
+    if (!porTag[tag]) porTag[tag] = {};
+    porTag[tag][r.hora] = r;
+  });
+
+  let html = `<table><thead><tr>
+    <th>Sensor</th><th>Parámetro</th><th>Variable</th>
+    ${etiquetasHora.map(e => `<th>${e}</th>`).join('')}
+  </tr></thead><tbody>`;
+
+  // Corriente
+  const corr = porTag['S110CR001:II'] || porTag['S110CR001-II'] || {};
+  html += fila('S110CR001', 'Corriente', 'Promedio', corr, 'promedio');
+  html += fila('', '', 'Máximo', corr, 'maximo');
+  html += fila('', 'Corriente sobre 100[%]', 'Sin carga', corr, 'sobre_100_sin', true);
+  html += fila('', '', 'Con carga', corr, 'sobre_100_con', true);
+  html += fila('', 'Corriente sobre 150[%]', 'Sin carga', corr, 'sobre_150_sin', true);
+  html += fila('', '', 'Con carga', corr, 'sobre_150_con', true);
+  html += fila('', 'Corriente sobre 180[%]', 'Sin carga', corr, 'sobre_180_sin', true);
+  html += fila('', '', 'Con carga', corr, 'sobre_180_con', true);
+
+  // Temperatura
+  const temp = porTag['S110CR01:TIT028A'] || porTag['S110CR01-TIT028A'] || {};
+  html += fila('TIT028A', 'Temperatura', 'Final tramo', temp, 'final');
+  html += fila('', '', 'Promedio', temp, 'promedio');
+  html += fila('', '', 'Máximo', temp, 'maximo');
+
+  // Presión
+  const pres = porTag['S110CR01:PIT017'] || porTag['S110CR01-PIT017'] || {};
+  html += fila('PIT017', 'Presión', 'Promedio', pres, 'promedio');
+  html += fila('', '', 'Máximo', pres, 'maximo');
+  html += fila('', '', 'Mínimo', pres, 'minimo');
+
+  // Vibraciones
+  const vitA = porTag['S110CR01:VIT014A'] || porTag['S110CR01-VIT014A'] || {};
+  const vitB = porTag['S110CR01:VIT014B'] || porTag['S110CR01-VIT014B'] || {};
+  html += fila('VIT014A', 'Vibración A', 'Promedio', vitA, 'promedio');
+  html += fila('', '', 'Máximo', vitA, 'maximo');
+  html += fila('VIT014B', 'Vibración B', 'Promedio', vitB, 'promedio');
+  html += fila('', '', 'Máximo', vitB, 'maximo');
+
+  // Posición
+  const zit = porTag['S110CR01:ZIT011'] || porTag['S110CR01-ZIT011'] || {};
+  html += fila('ZIT011', 'Posición', 'Promedio', zit, 'promedio');
+  html += fila('', '', 'Máximo', zit, 'maximo');
+
+  // Niveles
+  const lit = porTag['S110CR01:LIT029'] || porTag['S110CR01-LIT029'] || {};
+  const stock = porTag['C120STOCKPILE:LIT'] || porTag['C120STOCKPILE-LIT'] || {};
+  html += fila('LIT029', 'Nivel', 'Promedio', lit, 'promedio');
+  html += fila('', '', 'Máximo', lit, 'maximo');
+  html += fila('STOCKPILE', 'Stockpile', 'Promedio', stock, 'promedio');
+  html += fila('', '', 'Máximo', stock, 'maximo');
+
+  html += '</tbody></table>';
+  document.getElementById('tabla').innerHTML = html;
+}
+
+function fila(sensor, param, variable, data, campo, esConteo = false) {
+  const celdas = horas.map(h => {
+    const val = data[h]?.[campo];
+    if (val === undefined || val === null || val === '') return '<td>0</td>';
+    const fmt = esConteo ? Math.round(val) : Number(val).toFixed(1).replace('.', ',');
+    return `<td>${fmt}</td>`;
+  }).join('');
+  return `<tr>
+    <td class="sensor">${sensor}</td>
+    <td>${param}</td>
+    <td>${variable}</td>
+    ${celdas}
+  </tr>`;
+}
+</script>
+</body>
+</html>
