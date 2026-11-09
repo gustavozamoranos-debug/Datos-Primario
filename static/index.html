@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Informe Area Chancado</title>
+<style>
+  body { font-family: system-ui, Arial, sans-serif; background: #f8fafc; margin: 0; padding: 16px; }
+  h1 { text-align: center; color: #1e293b; margin: 0 0 4px 0; }
+  .subtitle { text-align: center; color: #64748b; margin: 0 0 16px 0; font-size: 0.9rem; }
+  .controls { text-align: center; margin-bottom: 16px; display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap; }
+  button, select, input { background: #f97316; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95rem; }
+  input[type="date"] { background: white; color: #1e293b; border: 1px solid #cbd5e1; }
+  table { width: 100%; border-collapse: collapse; background: white; font-size: 0.78rem; }
+  th, td { border: 1px solid #e2e8f0; padding: 4px 5px; text-align: center; }
+  th { background: #f97316; color: white; position: sticky; top: 0; }
+  .sensor { background: #fed7aa; font-weight: bold; text-align: left; }
+  .param { background: #ffedd5; }
+  #status { margin: 8px 0; text-align: center; color: #475569; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<h1>Informe Area Chancado</h1>
+<div class="subtitle">Réplica del Excel Primario.xlsm</div>
+
+<div class="controls">
+  <label>Fecha: <select id="fecha"><option value="">-- Selecciona --</option></select></label>
+  <label>Selección Turno: 
+    <select id="turno">
+      <option value="TA">TA (07:00 - 19:00)</option>
+      <option value="TB" selected>TB (19:00 - 07:00)</option>
+    </select>
+  </label>
+  <button id="btn">Actualizar datos</button>
+  <button id="btnFechas" type="button">Listar fechas disponibles</button>
+</div>
+<div id="status">Selecciona fecha y turno, luego actualiza.</div>
+<div id="info" style="text-align:center; margin:8px 0; font-size:0.9rem; color:#475569;">
+  Último dato: <span id="ultimo">-</span> &nbsp;|&nbsp; Hora actual: <span id="horaActual">-</span>
+</div>
+<div id="tabla"></div>
+
+<script>
+const turnoSelect = document.getElementById('turno');
+const fechaInput = document.getElementById('fecha');
+document.getElementById('btn').addEventListener('click', cargar);
+turnoSelect.addEventListener('change', cargar);
+fechaInput.addEventListener('change', cargar);
+
+// Establecer fecha de hoy por defecto
+
+
+function getHoras(turno) {
+  return turno === 'TA' 
+    ? [7,8,9,10,11,12,13,14,15,16,17,18]
+    : [19,20,21,22,23,0,1,2,3,4,5,6];
+}
+
+function getEtiquetas(horas) {
+  return horas.map(h => {
+    const next = (h + 1) % 24;
+    return `${String(h).padStart(2,'0')}:00 / ${String(next).padStart(2,'0')}:00`;
+  });
+}
+
+async function cargar() {
+  const status = document.getElementById('status');
+  const fecha = fechaInput.value;
+  if (!fecha) {
+    status.textContent = 'Selecciona una fecha.';
+    return;
+  }
+  status.textContent = 'Cargando...';
+  try {
+    const res = await fetch(`/api/resumen?fecha=${fecha}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Error');
+    renderTabla(data.resultados || []);
+    status.textContent = `Datos del ${fecha} · Turno ${turnoSelect.value} · ${(data.resultados || []).length} registros`;
+    if (data.ultimo_dato) {
+      document.getElementById('ultimo').textContent = new Date(data.ultimo_dato).toLocaleString('es-CL', {hour12:false});
+    }
+  } catch (e) {
+    status.textContent = 'Error: ' + e.message;
+  }
+}
+
+function renderTabla(registros) {
+  const turno = turnoSelect.value;
+  const horas = getHoras(turno);
+  const etiquetas = getEtiquetas(horas);
+
+  const porTag = {};
+  registros.forEach(r => {
+    const tag = (r.tag || '').toUpperCase();
+    const hora = r.hora;
+    if (!porTag[tag]) porTag[tag] = {};
+    porTag[tag][hora] = r;
+  });
+
+  let html = `<table><thead><tr>
+    <th>Sensor</th><th>Parámetro</th><th>Variable</th>
+    ${etiquetas.map(e => `<th>${e}</th>`).join('')}
+  </tr></thead><tbody>`;
+
+  // CORRIENTE
+  const corr = porTag['S110CR001:II'] || porTag['S110CR001-II'] || {};
+  html += fila('S110CR001', 'Corriente[%]', 'Promedio con carga', corr, 'promedio', horas);
+  html += fila('', '', 'Tiempo con Carga', corr, 'tiempo_con_carga', horas, false, true);
+  html += fila('', '', 'Promedio sin carga', corr, 'promedio_sin_carga', horas);
+  html += fila('', '', 'Tiempo sin carga', corr, 'tiempo_sin_carga', horas, false, true);
+  html += fila('', '', 'Tiempo detenido', corr, 'tiempo_detenido', horas, false, true);
+  html += fila('', '', 'Máximo', corr, 'maximo', horas);
+  html += fila('', '', 'Arranques', corr, 'arranques', horas, true);
+  html += fila('', 'Corriente sobre 100[%]', 'Sin carga', corr, 'sobre_100_sin', horas, true);
+  html += fila('', '', 'Con carga', corr, 'sobre_100_con', horas, true);
+  html += fila('', '', 'Tiempo sobre 100', corr, 'tiempo_sobre_100', horas, false, true);
+  html += fila('', 'Corriente sobre 150[%]', 'Sin carga', corr, 'sobre_150_sin', horas, true);
+  html += fila('', '', 'Con carga', corr, 'sobre_150_con', horas, true);
+  html += fila('', '', 'Tiempo sobre 150', corr, 'tiempo_sobre_150', horas, false, true);
+  html += fila('', 'Corriente sobre 180[%]', 'Sin carga', corr, 'sobre_180_sin', horas, true);
+  html += fila('', '', 'Con carga', corr, 'sobre_180_con', horas, true);
+  html += fila('', '', 'Tiempo sobre 180', corr, 'tiempo_sobre_180', horas, false, true);
+  html += fila('', '', 'Cantidad de datos', corr, 'n', horas, true);
+
+  // TEMPERATURAS
+  const temps = [
+    ['S110CR01:TIT028A', 'TIT028A', 'Temperatura aceite retorno [°C]'],
+    ['S110CR01:TIT019', 'TIT019', 'Temperatura aceite baja presion [°C]'],
+    ['S110CR01:TIT020', 'TIT020', 'Temperatura aceite alta presion [°C]'],
+    ['S110CR01:TIT028B', 'TIT028B', 'Temperatura aceite retorno [°C]'],
+    ['S110CR01:TIT015A', 'TIT015A', 'Temperatura descanso interior eje [°C]'],
+    ['S110CR01:TIT015B', 'TIT015B', 'Temperatura descanso interior eje [°C]'],
+  ];
+  temps.forEach(([tag, name, param]) => {
+    const d = porTag[tag] || {};
+    html += fila(name, param, 'Final tramo', d, 'final', horas);
+    html += fila('', '', 'Promedio', d, 'promedio', horas);
+    html += fila('', '', 'Máximo', d, 'maximo', horas);
+  });
+
+  // PRESIONES
+  const press = [
+    ['S110CR01:PIT017', 'PIT017', 'Presión cilindros balance'],
+    ['S110CR01:PIT019', 'PIT019', 'Presion aceite de baja presion'],
+    ['S110CR01:PIT020', 'PIT020', 'Presion aceite de alta presion'],
+  ];
+  press.forEach(([tag, name, param]) => {
+    const d = porTag[tag] || {};
+    html += fila(name, param, 'Promedio', d, 'promedio', horas);
+    html += fila('', '', 'Máximo', d, 'maximo', horas);
+    html += fila('', '', 'Mínimo', d, 'minimo', horas);
+  });
+
+  // DIFERENCIALES DE PRESIÓN
+  const dpis = [
+    ['S110CR001:DPI025', 'DPI025', 'Diferencial de presion BBA 21'],
+    ['S110CR001:DPI026', 'DPI026', 'Diferencial de presion BBA 22'],
+    ['S110CR001:DPI023', 'DPI023', 'Diferencial de presion BBA 23'],
+    ['S110CR001:DPI024', 'DPI024', 'Diferencial de presion BBA 24'],
+  ];
+  dpis.forEach(([tag, name, param]) => {
+    const d = porTag[tag] || {};
+    html += fila(name, param, 'Promedio', d, 'promedio', horas);
+    html += fila('', '', 'Máximo', d, 'maximo', horas);
+    html += fila('', '', 'Mínimo', d, 'minimo', horas);
+  });
+
+  // FLUJOS
+  const fits = [
+    ['S110CR01:FIT020', 'FIT020', 'Flujo aceite de alta presion'],
+    ['S110CR01:FIT019', 'FIT019', 'Flujo aceite de baja presion'],
+  ];
+  fits.forEach(([tag, name, param]) => {
+    const d = porTag[tag] || {};
+    html += fila(name, param, 'Promedio', d, 'promedio', horas);
+    html += fila('', '', 'Máximo', d, 'maximo', horas);
+    html += fila('', '', 'Mínimo', d, 'minimo', horas);
+  });
+
+  // VIBRACIONES
+  const vits = [
+    ['S110CR01:VIT014A', 'VIT014A', 'Vibracion A Descanso Interior Eje'],
+    ['S110CR01:VIT014B', 'VIT014B', 'Vibracion B Descanso Interior Eje'],
+  ];
+  vits.forEach(([tag, name, param]) => {
+    const d = porTag[tag] || {};
+    html += fila(name, param, 'Promedio', d, 'promedio', horas);
+    html += fila('', '', 'Máximo', d, 'maximo', horas);
+  });
+
+  // POSICIÓN, NIVEL, STOCKPILE
+  const otros = [
+    ['S110CR01:ZIT011', 'ZIT011', 'Posición del poste[%]', ['promedio','maximo','inicio','final']],
+    ['S110CR01:LIT029', 'LIT029', 'Nivel del TK[%]', ['final','maximo','minimo']],
+    ['C120STOCKPILE:LIT', 'STOCKPILE', 'Stockpile[%]', ['final']],
+  ];
+  otros.forEach(([tag, name, param, vars]) => {
+    const d = porTag[tag] || {};
+    vars.forEach((v, i) => {
+      const label = {promedio:'Promedio', maximo:'Máximo', minimo:'Mínimo', final:'Final tramo', inicio:'Inicio'}[v] || v;
+      html += fila(i===0?name:'', i===0?param:'', label, d, v, horas);
+    });
+  });
+
+  // ACTIVACIONES
+  const runs = [
+    ['S110CR001041:RUN', 'S110CR001041:RUN', 'Activaciones'],
+    ['S110CR001041:RUN_BBA', 'S110CR001041:RUN_BBA', 'Activaciones'],
+    ['S110CR001:LAL016', 'S110CR001:LAL016', 'Activaciones'],
+  ];
+  runs.forEach(([tag, name, param]) => {
+    const d = porTag[tag] || {};
+    html += fila(name, param, 'Activaciones', d, 'n', horas, true);
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('tabla').innerHTML = html;
+}
+
+function formatTiempo(segundos) {
+  if (!segundos || segundos <= 0) return '00:00';
+  const m = Math.floor(segundos / 60);
+  const s = Math.floor(segundos % 60);
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function fila(sensor, param, variable, data, campo, horas, entero=false, esTiempo=false) {
+  const celdas = horas.map(h => {
+    const val = data[h]?.[campo];
+    let fmt;
+    if (val == null || val === '') {
+      fmt = esTiempo ? '00:00' : (entero ? '0' : '0,0');
+    } else if (esTiempo) {
+      fmt = formatTiempo(val);
+    } else if (entero) {
+      fmt = Math.round(val);
+    } else {
+      fmt = Number(val).toFixed(1).replace('.', ',');
+    }
+    return `<td>${fmt}</td>`;
+  }).join('');
+  return `<tr><td class="sensor">${sensor}</td><td class="param">${param}</td><td>${variable}</td>${celdas}</tr>`;
+}
+
+async function cargarFechas() {
+  const status = document.getElementById('status');
+  status.textContent = 'Cargando fechas disponibles...';
+  try {
+    const res = await fetch('/api/fechas');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Error');
+    const fechas = data.fechas || [];
+    const select = document.getElementById('fecha');
+    select.innerHTML = '<option value="">-- Selecciona fecha --</option>';
+    fechas.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f;
+      opt.textContent = f;
+      select.appendChild(opt);
+    });
+    if (fechas.length > 0) {
+      select.value = fechas[0];
+      status.textContent = `${fechas.length} fecha(s) disponible(s)`;
+      cargar();
+    } else {
+      status.textContent = 'No hay fechas disponibles todavía.';
+    }
+  } catch (e) {
+    status.textContent = 'Error al listar fechas: ' + e.message;
+  }
+}
+
+document.getElementById('btnFechas').addEventListener('click', cargarFechas);
+// Cargar fechas al iniciar
+cargarFechas();
+
+function actualizarHora() {
+  const now = new Date();
+  document.getElementById('horaActual').textContent = now.toLocaleString('es-CL', {hour12:false});
+}
+setInterval(actualizarHora, 1000);
+actualizarHora();
+
+// Auto-refresh every 60 seconds
+setInterval(() => {
+  if (document.getElementById('fecha').value) cargar();
+}, 60000);
+</script>
+</body>
+</html>
