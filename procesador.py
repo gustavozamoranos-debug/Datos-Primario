@@ -157,9 +157,9 @@ def procesar_tag_completo(data: Dict[str, Any]) -> Dict[str, Any]:
                 if pv is None or pt.get("time") is None:
                     continue
                 if hora_data["maximo_ts"] is None and pv == max_val:
-                    hora_data["maximo_ts"] = pt["time"].isoformat()
+                    hora_data["maximo_ts"] = pt["time"].strftime("%Y-%m-%dT%H:%M:%S")
                 if hora_data["minimo_ts"] is None and pv == min_val:
-                    hora_data["minimo_ts"] = pt["time"].isoformat()
+                    hora_data["minimo_ts"] = pt["time"].strftime("%Y-%m-%dT%H:%M:%S")
 
         if is_corriente and len(pts) >= 2:
             vals_carga = [v for v in vals if v is not None and v > 39]

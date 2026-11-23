@@ -139,9 +139,11 @@
 
 window.mostrarTimestamp = function(ts, label) {
   if (!ts) return;
-  const d = new Date(ts);
-  const pad = n => String(n).padStart(2,'0');
-  const fmt = pad(d.getDate()) + '-' + pad(d.getMonth()+1) + '-' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  // Usar el timestamp tal cual (ya está en hora local)
+  const parts = ts.replace('T', ' ').split(' ');
+  const datePart = parts[0].split('-');
+  const timePart = parts[1] || '00:00:00';
+  const fmt = datePart[2] + '-' + datePart[1] + '-' + datePart[0] + ' ' + timePart.substring(0, 8);
   
   let pop = document.getElementById('tsPopup');
   if (!pop) {
