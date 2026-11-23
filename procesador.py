@@ -148,18 +148,18 @@ def procesar_tag_completo(data: Dict[str, Any]) -> Dict[str, Any]:
         }
         
         
-        # Timestamp exacto del máximo y mínimo
+        # Timestamp exacto del máximo y mínimo (primer valor exacto)
         if vals:
             max_val = max(vals)
             min_val = min(vals)
             for pt in pts:
                 pv = pt.get("value")
-                if pv is None:
+                if pv is None or pt.get("time") is None:
                     continue
-                if abs(pv - max_val) < 0.001 and hora_data["maximo_ts"] is None:
-                    hora_data["maximo_ts"] = pt["time"].isoformat() if pt.get("time") else None
-                if abs(pv - min_val) < 0.001 and hora_data["minimo_ts"] is None:
-                    hora_data["minimo_ts"] = pt["time"].isoformat() if pt.get("time") else None
+                if hora_data["maximo_ts"] is None and pv == max_val:
+                    hora_data["maximo_ts"] = pt["time"].isoformat()
+                if hora_data["minimo_ts"] is None and pv == min_val:
+                    hora_data["minimo_ts"] = pt["time"].isoformat()
 
         if is_corriente and len(pts) >= 2:
             vals_carga = [v for v in vals if v is not None and v > 39]

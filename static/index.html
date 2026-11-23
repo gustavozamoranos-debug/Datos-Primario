@@ -138,13 +138,32 @@
 <script>
 
 window.mostrarTimestamp = function(ts, label) {
-  if (!ts) { alert('Sin timestamp disponible'); return; }
+  if (!ts) return;
   const d = new Date(ts);
-  const fmt = d.toLocaleString('es-CL', {
-    day:'2-digit', month:'2-digit', year:'numeric',
-    hour:'2-digit', minute:'2-digit', second:'2-digit'
-  }).replace(',', '');
-  alert(label + ': ' + fmt);
+  const pad = n => String(n).padStart(2,'0');
+  const fmt = pad(d.getDate()) + '-' + pad(d.getMonth()+1) + '-' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  
+  let pop = document.getElementById('tsPopup');
+  if (!pop) {
+    pop = document.createElement('div');
+    pop.id = 'tsPopup';
+    pop.style.cssText = 'position:fixed;background:#1e293b;color:#fff;padding:8px 12px;border-radius:6px;font-size:0.85rem;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.3);';
+    document.body.appendChild(pop);
+  }
+  pop.textContent = fmt;
+  const e = window.event;
+  pop.style.left = (e.clientX + 10) + 'px';
+  pop.style.top = (e.clientY + 10) + 'px';
+  pop.style.display = 'block';
+  
+  setTimeout(() => {
+    document.addEventListener('click', function closePop(ev) {
+      if (!pop.contains(ev.target)) {
+        pop.style.display = 'none';
+        document.removeEventListener('click', closePop);
+      }
+    });
+  }, 10);
 }
 
 const turnoSelect = document.getElementById('turno');
