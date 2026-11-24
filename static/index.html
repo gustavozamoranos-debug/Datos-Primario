@@ -950,7 +950,9 @@ function renderResumenTurno() {
     const fields = getFieldsForTag(tag);
     
     // Check if sensor is selected in left panel
-    if (!selectedTags.has(tag) && selectedTags.size > 0) return;
+    const tagLower = tag.toLowerCase();
+    const isSelected = [...selectedTags].some(t => t.toUpperCase() === tag);
+    if (!isSelected && selectedTags.size > 0) return;
     
     // Check category expansion
     let cat = 'otros';
