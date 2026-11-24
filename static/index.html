@@ -911,7 +911,8 @@ function renderResumenTurno() {
     porTag[tag].push(r);
   });
 
-  let html = '<div class="card"><h2>Resumen del Turno ' + turnoSelect.value + '</h2>';
+  let html = '<div class="card"><h2>Resumen del Turno ' + turnoSelect.value + 
+    ' <button onclick="summaryMode=false;renderMultiDetail();" style="margin-left:16px;background:#64748b;font-size:0.85rem;padding:4px 12px;">← Volver a tabla</button></h2>';
   
   // Ordenar por el orden del panel izquierdo
   const orderedTags = [];
