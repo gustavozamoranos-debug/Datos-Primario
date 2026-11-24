@@ -857,9 +857,19 @@ function renderResumenTurno() {
     const fields = getFieldsForTag(tag);
     const visible = ensureVisibleVars(tag);
     
-    // Filter to only visible fields
+    // Only include sensors that have at least one visible variable
     const visibleFields = fields.filter(([, label]) => visible.has(label));
     if (!visibleFields.length) return;
+    
+    // Skip if the sensor category is collapsed
+    let cat = 'otros';
+    for (const [catId, catObj] of Object.entries(STRUCTURE)) {
+      if (catObj.sensors.some(s => s.tag.toUpperCase() === tag || (s.short === 'STOCKPILE' && tag.includes('STOCKPILE')))) {
+        cat = catId;
+        break;
+      }
+    }
+    if (!expandedCats[cat]) return;
     
     html += `<h3 style="margin:16px 0 8px;font-size:1rem;">${info ? info.short : tag} · ${info ? info.desc : ''}</h3>`;
     html += '<table class="hours-table"><thead><tr><th style="text-align:left;">Variable</th><th>Valor</th><th>Hora</th></tr></thead><tbody>';
