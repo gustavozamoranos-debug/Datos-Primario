@@ -183,6 +183,19 @@ document.getElementById('btn').addEventListener('click', cargar);
 turnoSelect.addEventListener('change', cargar);
 fechaInput.addEventListener('change', cargar);
 
+
+function debounce(fn, ms) {
+  let timer;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), ms);
+  };
+}
+const debouncedRender = debounce(() => {
+  if (summaryMode) renderResumenTurno();
+  else renderMultiDetail();
+}, 50);
+
 let currentData = [];
 let summaryMode = false;
 let selectedTags = new Set();
@@ -837,8 +850,8 @@ function toggleVar(tag, label) {
   } else {
     visible.add(label);
   }
-  openDropdownTag = tag;  // mantener abierto
-  renderMultiDetail();
+  openDropdownTag = tag;
+  debouncedRender();
 }
 
 // Cerrar solo al hacer clic fuera
@@ -863,7 +876,7 @@ function toggleSummaryVar(tag, label) {
   const visible = ensureSummaryVisible(tag);
   if (visible.has(label)) visible.delete(label);
   else visible.add(label);
-  renderResumenTurno();
+  debouncedRender();
 }
 
 function selectAllSummaryVars(tag) {
@@ -965,8 +978,8 @@ function renderResumenTurno() {
       </div>
     </div>`;
     
-    html += `<h3 style="margin:16px 0 8px;font-size:1rem;">${info ? info.short : tag} · ${info ? info.desc : ''} ${filterMenu}</h3>`;
-    html += '<table class="hours-table"><thead><tr><th style="text-align:left;">Variable</th><th>Valor</th><th>Hora</th></tr></thead><tbody>';
+    html += `<h3 style="margin:16px 0 8px;font-size:1rem;">${info ? info.short : tag} · ${info ? info.desc : ''}</h3>`;
+    html += `<table class="hours-table"><thead><tr><th style="text-align:left;">Variable ${filterMenu}</th><th>Valor</th><th>Hora</th></tr></thead><tbody>`;
     
     visibleFields.forEach(([campo, label]) => {
       const vals = rows.map(r => ({ v: r[campo], ts: r[campo + '_ts'], hora: r.hora })).filter(x => x.v != null && x.v !== 0 && x.v !== '');
