@@ -975,6 +975,7 @@ function renderResumenTurno() {
   
   html += '</div>';
   main.innerHTML = html;
+  } catch(e) { console.error(e); alert("Error: " + e.message); }
 }
 
 async function cargarFechas() {
