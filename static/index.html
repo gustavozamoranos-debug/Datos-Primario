@@ -185,6 +185,7 @@ fechaInput.addEventListener('change', cargar);
 
 let currentData = [];
 let selectedTags = new Set();
+const summaryVisibleVars = {};
 
 let ventanaHoras = parseInt(localStorage.getItem('ventanaHoras') || '4');
 let showConfig = false;
