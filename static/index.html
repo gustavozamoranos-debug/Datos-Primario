@@ -873,6 +873,25 @@ function selectAllSummaryVars(tag) {
   renderResumenTurno();
 }
 
+
+let openSummaryDropdown = null;
+function toggleSummaryFilter(e, safeTag) {
+  e.stopPropagation();
+  const drop = document.getElementById('summaryDrop_' + safeTag);
+  if (!drop) return;
+  if (openSummaryDropdown && openSummaryDropdown !== drop) {
+    openSummaryDropdown.classList.remove('open');
+  }
+  drop.classList.toggle('open');
+  openSummaryDropdown = drop.classList.contains('open') ? drop : null;
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.excel-filter') && openSummaryDropdown) {
+    openSummaryDropdown.classList.remove('open');
+    openSummaryDropdown = null;
+  }
+});
+
 function renderResumenTurno() {
   try {
   const main = document.getElementById('main');
@@ -891,7 +910,21 @@ function renderResumenTurno() {
 
   let html = '<div class="card"><h2>Resumen del Turno ' + turnoSelect.value + '</h2>';
   
-  Object.entries(porTag).forEach(([tag, rows]) => {
+  // Ordenar por el orden del panel izquierdo
+  const orderedTags = [];
+  Object.values(STRUCTURE).forEach(cat => {
+    cat.sensors.forEach(s => {
+      const t = s.tag.toUpperCase();
+      if (porTag[t]) orderedTags.push(t);
+    });
+  });
+  // Agregar los que no estén en STRUCTURE
+  Object.keys(porTag).forEach(t => {
+    if (!orderedTags.includes(t)) orderedTags.push(t);
+  });
+  
+  orderedTags.forEach(tag => {
+    const rows = porTag[tag];
     const info = getSensorInfo(tag);
     const fields = getFieldsForTag(tag);
     
@@ -913,11 +946,18 @@ function renderResumenTurno() {
     if (!visibleFields.length) return;
     
     // Filter menu for this sensor
-    const filterMenu = `<div class="excel-filter" style="display:inline-block;margin-left:8px;">
-      <button class="filter-btn" onclick="event.stopPropagation(); this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block'">▼</button>
-      <div class="filter-dropdown" style="display:none;position:absolute;background:#fff;border:1px solid #ccc;padding:8px;z-index:100;">
-        <label><input type="checkbox" ${fields.every(([,l]) => summaryVisible.has(l)) ? 'checked' : ''} onchange="selectAllSummaryVars('${tag}')"> (Seleccionar todo)</label><br>
-        ${fields.map(([, l]) => `<label><input type="checkbox" ${summaryVisible.has(l) ? 'checked' : ''} onchange="toggleSummaryVar('${tag}', '${l}')"> ${l}</label><br>`).join('')}
+    const safeTag = tag.replace(/[^a-zA-Z0-9]/g, '_');
+    const filterMenu = `<div class="excel-filter">
+      <button class="excel-filter-btn" onclick="toggleSummaryFilter(event, '${safeTag}')" title="Filtrar variables">&#9660;</button>
+      <div class="excel-dropdown" id="summaryDrop_${safeTag}">
+        <label class="excel-dropdown-item">
+          <input type="checkbox" ${fields.every(([,l]) => summaryVisible.has(l)) ? 'checked' : ''} onchange="selectAllSummaryVars('${tag}')">
+          (Seleccionar todo)
+        </label>
+        ${fields.map(([, l]) => `<label class="excel-dropdown-item">
+          <input type="checkbox" ${summaryVisible.has(l) ? 'checked' : ''} onchange="toggleSummaryVar('${tag}', '${l}')">
+          ${l}
+        </label>`).join('')}
       </div>
     </div>`;
     
