@@ -841,10 +841,14 @@ document.addEventListener('click', (e) => {
 
 function renderResumenTurno() {
   const main = document.getElementById('main');
-  const horasObj = getHoras(turnoSelect.value);
+  const turno = turnoSelect.value;
+  const horasObj = getHoras(turno);
+  const horasTurno = horasObj.map(h => h.hora);
   const porTag = {};
   
+  // Solo datos del turno seleccionado
   currentData.forEach(r => {
+    if (!horasTurno.includes(r.hora)) return;
     const tag = (r.tag || '').toUpperCase();
     if (!porTag[tag]) porTag[tag] = [];
     porTag[tag].push(r);
