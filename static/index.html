@@ -101,6 +101,13 @@
   .spark { height: 40px; display: flex; align-items: end; gap: 2px; margin-top: 8px; }
   .spark div { flex: 1; background: var(--primary); border-radius: 2px 2px 0 0; opacity: 0.7; }
   #status { padding: 8px 20px; background: #fffbeb; color: #92400e; font-size: 0.85rem; text-align: center; }
+
+.resumen-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.resumen-table th, .resumen-table td { border: 1px solid var(--border); padding: 6px 10px; }
+.resumen-table th { background: #f97316; color: #fff; font-weight: 600; }
+.resumen-table td:first-child { text-align: left; width: 40%; }
+.resumen-table td:nth-child(2) { text-align: right; width: 25%; }
+.resumen-table td:nth-child(3) { text-align: left; width: 35%; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -119,6 +126,7 @@
     </label>
     <button id="btn">Actualizar</button>
     <button id="btnFechas" type="button">Listar fechas</button>
+    <button id="btnResumen" type="button">Ver Resumen Turno</button>
   </div>
   <div class="info">Último: <span id="ultimo">-</span> · Ahora: <span id="horaActual">-</span></div>
 </header>
@@ -837,6 +845,100 @@ document.addEventListener('click', (e) => {
   }
 });
 
+
+function renderResumenTurno() {
+  const main = document.getElementById('main');
+  const turno = turnoSelect.value;
+  const horasObj = getHoras(turno);
+  const horasTurno = horasObj.map(h => h.hora);
+  const porTag = {};
+  
+  // Solo datos del turno seleccionado
+  currentData.forEach(r => {
+    if (!horasTurno.includes(r.hora)) return;
+    const tag = (r.tag || '').toUpperCase();
+    if (!porTag[tag]) porTag[tag] = [];
+    porTag[tag].push(r);
+  });
+
+  let html = '<div class="card"><h2>Resumen del Turno ' + turnoSelect.value + '</h2>';
+  
+  Object.entries(porTag).forEach(([tag, rows]) => {
+    const info = getSensorInfo(tag);
+    const fields = getFieldsForTag(tag);
+    const visible = ensureVisibleVars(tag);
+    
+    // Only include sensors that have at least one visible variable
+    const visibleFields = fields.filter(([, label]) => visible.has(label));
+    if (!visibleFields.length) return;
+    
+    // Skip if the sensor category is collapsed
+    let cat = 'otros';
+    for (const [catId, catObj] of Object.entries(STRUCTURE)) {
+      if (catObj.sensors.some(s => s.tag.toUpperCase() === tag || (s.short === 'STOCKPILE' && tag.includes('STOCKPILE')))) {
+        cat = catId;
+        break;
+      }
+    }
+    if (!expandedCats[cat]) return;
+    
+    html += `<h3 style="margin:16px 0 8px;font-size:1rem;">${info ? info.short : tag} · ${info ? info.desc : ''}</h3>`;
+    html += '<table class="resumen-table"><thead><tr><th style="text-align:left;">Variable</th><th>Valor</th><th>Hora</th></tr></thead><tbody>';
+    
+    visibleFields.forEach(([campo, label]) => {
+      const vals = rows.map(r => ({ v: r[campo], ts: r[campo + '_ts'], hora: r.hora })).filter(x => x.v != null && x.v !== 0 && x.v !== '');
+      if (!vals.length) {
+        html += `<tr><td style="text-align:left;">${label}</td><td>0,0</td><td>-</td></tr>`;
+        return;
+      }
+      
+      let valor, horaStr = '-';
+      if (campo.startsWith('tiempo_') || campo === 'n' || campo === 'arranques' || campo.startsWith('sobre_')) {
+        valor = vals.reduce((a, x) => a + Number(x.v), 0);
+        if (campo.startsWith('tiempo_')) {
+          const h = Math.floor(valor / 3600);
+          const m = Math.floor((valor % 3600) / 60);
+          const s = Math.floor(valor % 60);
+          valor = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+        } else valor = Math.round(valor);
+      } else if (campo === 'final' || campo === 'inicio') {
+        const last = [...rows].reverse().find(r => r[campo] && r[campo] !== 0);
+        valor = last ? Number(last[campo]).toFixed(1).replace('.',',') : '0,0';
+        horaStr = last ? String(last.hora).padStart(2,'0') + ':00' : '-';
+      } else if (campo === 'maximo') {
+        const maxItem = vals.reduce((a, x) => Number(x.v) > Number(a.v) ? x : a, vals[0]);
+        valor = Number(maxItem.v).toFixed(1).replace('.',',');
+        if (maxItem.ts) {
+          const parts = maxItem.ts.replace('T', ' ').split(' ');
+          const dp = parts[0].split('-');
+          horaStr = dp[2] + '-' + dp[1] + '-' + dp[0] + ' ' + (parts[1] || '').substring(0, 8);
+        } else {
+          horaStr = String(maxItem.hora).padStart(2,'0') + ':00';
+        }
+      } else if (campo === 'minimo') {
+        const minItem = vals.reduce((a, x) => Number(x.v) < Number(a.v) ? x : a, vals[0]);
+        valor = Number(minItem.v).toFixed(1).replace('.',',');
+        if (minItem.ts) {
+          const parts = minItem.ts.replace('T', ' ').split(' ');
+          const dp = parts[0].split('-');
+          horaStr = dp[2] + '-' + dp[1] + '-' + dp[0] + ' ' + (parts[1] || '').substring(0, 8);
+        } else {
+          horaStr = String(minItem.hora).padStart(2,'0') + ':00';
+        }
+      } else {
+        const avg = vals.reduce((a, x) => a + Number(x.v), 0) / vals.length;
+        valor = avg.toFixed(1).replace('.',',');
+      }
+      
+      html += `<tr><td style="text-align:left;">${label}</td><td>${valor}</td><td>${horaStr}</td></tr>`;
+    });
+    html += '</tbody></table>';
+  });
+  
+  html += '</div>';
+  main.innerHTML = html;
+}
+
 async function cargarFechas() {
   try {
     const res = await fetch('/api/fechas');
@@ -852,6 +954,7 @@ async function cargarFechas() {
   } catch(e) {}
 }
 document.getElementById('btnFechas').addEventListener('click', cargarFechas);
+document.getElementById('btnResumen').addEventListener('click', renderResumenTurno);
 cargarFechas();
 </script>
 </body>
