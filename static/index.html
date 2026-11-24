@@ -873,6 +873,7 @@ function selectAllSummaryVars(tag) {
 }
 
 function renderResumenTurno() {
+  try {
   const main = document.getElementById('main');
   const turno = turnoSelect.value;
   const horasObj = getHoras(turno);
