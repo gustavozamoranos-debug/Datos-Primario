@@ -70,6 +70,7 @@
   .metric { background: #f8fafc; border-radius: 8px; padding: 12px; text-align: center; }
   .metric .label { font-size: 0.75rem; color: var(--muted); }
   .metric .value { font-size: 1.4rem; font-weight: 700; margin-top: 4px; }
+  .hours-table { table-layout: auto; }
   .hours-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 12px; table-layout: fixed; }
   .hours-table td[onclick]:hover { outline: 1px solid #f97316; }
   .hours-table th, .hours-table td { border: 1px solid var(--border); padding: 6px 4px; text-align: center; }
@@ -846,6 +847,31 @@ document.addEventListener('click', (e) => {
 });
 
 
+
+function ensureSummaryVisible(tag) {
+  if (!summaryVisibleVars[tag]) {
+    const fields = getFieldsForTag(tag);
+    summaryVisibleVars[tag] = new Set(fields.map(([, l]) => l));
+  }
+  return summaryVisibleVars[tag];
+}
+
+function toggleSummaryVar(tag, label) {
+  const visible = ensureSummaryVisible(tag);
+  if (visible.has(label)) visible.delete(label);
+  else visible.add(label);
+  renderResumenTurno();
+}
+
+function selectAllSummaryVars(tag) {
+  const visible = ensureSummaryVisible(tag);
+  const fields = getFieldsForTag(tag);
+  const labels = fields.map(([, l]) => l);
+  if (labels.every(l => visible.has(l))) visible.clear();
+  else labels.forEach(l => visible.add(l));
+  renderResumenTurno();
+}
+
 function renderResumenTurno() {
   const main = document.getElementById('main');
   const turno = turnoSelect.value;
@@ -866,13 +892,11 @@ function renderResumenTurno() {
   Object.entries(porTag).forEach(([tag, rows]) => {
     const info = getSensorInfo(tag);
     const fields = getFieldsForTag(tag);
-    const visible = ensureVisibleVars(tag);
     
-    // Only include sensors that have at least one visible variable
-    const visibleFields = fields.filter(([, label]) => visible.has(label));
-    if (!visibleFields.length) return;
+    // Check if sensor is selected in left panel
+    if (!selectedTags.has(tag) && selectedTags.size > 0) return;
     
-    // Skip if the sensor category is collapsed
+    // Check category expansion
     let cat = 'otros';
     for (const [catId, catObj] of Object.entries(STRUCTURE)) {
       if (catObj.sensors.some(s => s.tag.toUpperCase() === tag || (s.short === 'STOCKPILE' && tag.includes('STOCKPILE')))) {
@@ -882,8 +906,21 @@ function renderResumenTurno() {
     }
     if (!expandedCats[cat]) return;
     
-    html += `<h3 style="margin:16px 0 8px;font-size:1rem;">${info ? info.short : tag} · ${info ? info.desc : ''}</h3>`;
-    html += '<table class="resumen-table"><thead><tr><th style="text-align:left;">Variable</th><th>Valor</th><th>Hora</th></tr></thead><tbody>';
+    const summaryVisible = ensureSummaryVisible(tag);
+    const visibleFields = fields.filter(([, label]) => summaryVisible.has(label));
+    if (!visibleFields.length) return;
+    
+    // Filter menu for this sensor
+    const filterMenu = `<div class="excel-filter" style="display:inline-block;margin-left:8px;">
+      <button class="filter-btn" onclick="event.stopPropagation(); this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block'">▼</button>
+      <div class="filter-dropdown" style="display:none;position:absolute;background:#fff;border:1px solid #ccc;padding:8px;z-index:100;">
+        <label><input type="checkbox" ${fields.every(([,l]) => summaryVisible.has(l)) ? 'checked' : ''} onchange="selectAllSummaryVars('${tag}')"> (Seleccionar todo)</label><br>
+        ${fields.map(([, l]) => `<label><input type="checkbox" ${summaryVisible.has(l) ? 'checked' : ''} onchange="toggleSummaryVar('${tag}', '${l}')"> ${l}</label><br>`).join('')}
+      </div>
+    </div>`;
+    
+    html += `<h3 style="margin:16px 0 8px;font-size:1rem;">${info ? info.short : tag} · ${info ? info.desc : ''} ${filterMenu}</h3>`;
+    html += '<table class="hours-table"><thead><tr><th style="text-align:left;">Variable</th><th>Valor</th><th>Hora</th></tr></thead><tbody>';
     
     visibleFields.forEach(([campo, label]) => {
       const vals = rows.map(r => ({ v: r[campo], ts: r[campo + '_ts'], hora: r.hora })).filter(x => x.v != null && x.v !== 0 && x.v !== '');
