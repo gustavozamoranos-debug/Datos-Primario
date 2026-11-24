@@ -184,6 +184,7 @@ turnoSelect.addEventListener('change', cargar);
 fechaInput.addEventListener('change', cargar);
 
 let currentData = [];
+let summaryMode = false;
 let selectedTags = new Set();
 const summaryVisibleVars = {};
 
@@ -701,6 +702,7 @@ function toggleSelect(tag, event) {
 }
 
 function renderMultiDetail() {
+  if (summaryMode) return;
   const main = document.getElementById('main');
   if (selectedTags.size === 0) {
     main.innerHTML = `<div class="card">
@@ -893,6 +895,7 @@ document.addEventListener('click', (e) => {
 });
 
 function renderResumenTurno() {
+  summaryMode = true;
   try {
   const main = document.getElementById('main');
   const turno = turnoSelect.value;
@@ -971,7 +974,7 @@ function renderResumenTurno() {
         return;
       }
       
-      let valor, horaStr = '-';
+      let valor, horaStr = '';
       if (campo.startsWith('tiempo_') || campo === 'n' || campo === 'arranques' || campo.startsWith('sobre_')) {
         valor = vals.reduce((a, x) => a + Number(x.v), 0);
         if (campo.startsWith('tiempo_')) {
@@ -983,7 +986,7 @@ function renderResumenTurno() {
       } else if (campo === 'final' || campo === 'inicio') {
         const last = [...rows].reverse().find(r => r[campo] && r[campo] !== 0);
         valor = last ? Number(last[campo]).toFixed(1).replace('.',',') : '0,0';
-        horaStr = last ? String(last.hora).padStart(2,'0') + ':00' : '-';
+        horaStr = '-';
       } else if (campo === 'maximo') {
         const maxItem = vals.reduce((a, x) => Number(x.v) > Number(a.v) ? x : a, vals[0]);
         valor = Number(maxItem.v).toFixed(1).replace('.',',');
@@ -1035,6 +1038,7 @@ async function cargarFechas() {
 }
 document.getElementById('btnFechas').addEventListener('click', cargarFechas);
 document.getElementById('btnResumen').addEventListener('click', renderResumenTurno);
+document.getElementById('btnActualizar')?.addEventListener('click', () => { summaryMode = false; });
 cargarFechas();
 </script>
 </body>
