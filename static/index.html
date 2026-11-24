@@ -711,7 +711,11 @@ function toggleSelect(tag, event) {
     selectedTags.add(tag);
   }
   renderSensorList();
-  renderMultiDetail();
+  if (summaryMode) {
+    renderResumenTurno();
+  } else {
+    renderMultiDetail();
+  }
 }
 
 function renderMultiDetail() {
