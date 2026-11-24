@@ -199,6 +199,7 @@ const debouncedRender = debounce(() => {
 let currentData = [];
 let summaryMode = false;
 let selectedTags = new Set();
+let summarySelectedTags = new Set();
 const summaryVisibleVars = {};
 
 let ventanaHoras = parseInt(localStorage.getItem('ventanaHoras') || '4');
@@ -643,8 +644,9 @@ function renderSensorList() {
   if (showAlerts && alerts.length > 0) {
     html += `<div class="alarm-list">`;
     alerts.forEach(s => {
-      const checked = selectedTags.has(s.tag) ? 'checked' : '';
-      const active = selectedTags.has(s.tag) ? 'active' : '';
+      const activeSet = summaryMode ? summarySelectedTags : selectedTags;
+      const checked = activeSet.has(s.tag) ? 'checked' : '';
+      const active = activeSet.has(s.tag) ? 'active' : '';
       const dotClass = s.st === 'crit' ? 'status-crit' : 'status-warn';
       html += `<div class="sensor-item ${active}" onclick="toggleSelect('${s.tag}', event)">
         <div class="sensor-info">
@@ -673,8 +675,9 @@ function renderSensorList() {
     if (expanded) {
       html += `<div class="category-content">`;
       items.forEach(s => {
-        const checked = selectedTags.has(s.tag) ? 'checked' : '';
-        const active = selectedTags.has(s.tag) ? 'active' : '';
+        const activeSet = summaryMode ? summarySelectedTags : selectedTags;
+      const checked = activeSet.has(s.tag) ? 'checked' : '';
+        const active = activeSet.has(s.tag) ? 'active' : '';
         const dotClass = s.st === 'crit' ? 'status-crit' : s.st === 'warn' ? 'status-warn' : 'status-ok';
         const opacity = s.hasData ? '1' : '0.55';
         html += `<div class="sensor-item ${active}" style="opacity:${opacity}" onclick="toggleSelect('${s.tag}', event)">
@@ -704,10 +707,11 @@ function toggleCategory(cat) {
 
 function toggleSelect(tag, event) {
   if (event) event.stopPropagation();
-  if (selectedTags.has(tag)) {
-    selectedTags.delete(tag);
+  const tags = summaryMode ? summarySelectedTags : selectedTags;
+  if (tags.has(tag)) {
+    tags.delete(tag);
   } else {
-    selectedTags.add(tag);
+    tags.add(tag);
   }
   renderSensorList();
   if (summaryMode) {
@@ -950,9 +954,8 @@ function renderResumenTurno() {
     const fields = getFieldsForTag(tag);
     
     // Check if sensor is selected in left panel
-    const tagLower = tag.toLowerCase();
-    const isSelected = [...selectedTags].some(t => t.toUpperCase() === tag);
-    if (!isSelected && selectedTags.size > 0) return;
+    const isSelected = [...summarySelectedTags].some(t => t.toUpperCase() === tag);
+    if (!isSelected && summarySelectedTags.size > 0) return;
     
     // Check category expansion
     let cat = 'otros';
