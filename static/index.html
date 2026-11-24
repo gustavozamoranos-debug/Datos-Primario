@@ -304,8 +304,7 @@ function getFieldsForTag(tag) {
 
 function ensureVisibleVars(tag) {
   if (!visibleVarsByTag[tag]) {
-    const fields = getFieldsForTag(tag);
-    visibleVarsByTag[tag] = new Set(fields.map(([, l]) => l));
+    visibleVarsByTag[tag] = new Set();  // Iniciar deseleccionado
   }
   return visibleVarsByTag[tag];
 }
@@ -870,8 +869,7 @@ document.addEventListener('click', (e) => {
 
 function ensureSummaryVisible(tag) {
   if (!summaryVisibleVars[tag]) {
-    const fields = getFieldsForTag(tag);
-    summaryVisibleVars[tag] = new Set(fields.map(([, l]) => l));
+    summaryVisibleVars[tag] = new Set();  // Iniciar deseleccionado
   }
   return summaryVisibleVars[tag];
 }
@@ -894,6 +892,7 @@ function selectAllSummaryVars(tag) {
 
 
 let openSummaryDropdown = null;
+let openSummaryDropdownTag = null;
 function toggleSummaryFilter(e, safeTag) {
   e.stopPropagation();
   const drop = document.getElementById('summaryDrop_' + safeTag);
@@ -903,6 +902,7 @@ function toggleSummaryFilter(e, safeTag) {
   }
   drop.classList.toggle('open');
   openSummaryDropdown = drop.classList.contains('open') ? drop : null;
+  openSummaryDropdownTag = drop.classList.contains('open') ? safeTag : null;
 }
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.excel-filter') && openSummaryDropdown) {
@@ -1037,6 +1037,11 @@ function renderResumenTurno() {
   
   html += '</div>';
   main.innerHTML = html;
+  // Re-abrir dropdown si estaba abierto
+  if (openSummaryDropdownTag) {
+    const drop = document.getElementById('summaryDrop_' + openSummaryDropdownTag);
+    if (drop) { drop.classList.add('open'); openSummaryDropdown = drop; }
+  }
   } catch(e) { console.error(e); alert("Error: " + e.message); }
 }
 
